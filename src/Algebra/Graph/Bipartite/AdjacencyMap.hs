@@ -21,15 +21,19 @@ module Algebra.Graph.Bipartite.AdjacencyMap (
     AdjacencyMap, leftAdjacencyMap, rightAdjacencyMap,
 
     -- * Basic graph construction primitives
-    empty, leftVertex, rightVertex, vertex, edge, overlay, connect, vertices, edges,
-    overlays, connects,
+    empty, leftVertex, rightVertex, vertex, edge, overlay, connect, vertices,
+    edges, overlays, connects,
 
     -- * Conversion functions
     toBipartite, fromBipartite, fromGraph,
 
+    -- * Testing bipartiteness
+    detectParts,
+
     -- * Graph properties
     isEmpty, hasEdge, hasLeftVertex, hasRightVertex, hasVertex, leftVertexCount,
-    rightVertexCount, vertexCount, edgeCount,
+    rightVertexCount, vertexCount, edgeCount, leftVertexList, rightVertexList,
+    vertexList, edgeList, leftVertexSet, rightVertexSet, vertexSet, edgeSet,
 
     -- * Miscellaneous
     consistent,
@@ -429,3 +433,132 @@ overlays ams = BAM (Map.unionsWith Set.union (map leftAdjacencyMap ams)) $
 -- @
 connects :: (Ord a, Ord b) => [AdjacencyMap a b] -> AdjacencyMap a b
 connects = foldr connect empty
+
+
+-- | The sorted list of vertices of the left part of a given graph.
+-- Complexity: /O(l)/ time and memory.
+--
+-- @
+-- leftVertexList 'empty'                == []
+-- leftVertexList ('leftVertex' x)       == [x]
+-- leftVertexList ('rightVertex' x)      == []
+-- leftVertexList . ('flip' 'vertices') [] == 'Data.List.nub' . 'Data.List.sort'
+-- @
+leftVertexList :: AdjacencyMap a b -> [a]
+leftVertexList = Map.keys . leftAdjacencyMap
+
+
+-- | The sorted list of vertices of the right part of a given graph.
+-- Complexity: /O(r)/ time and memory.
+--
+-- @
+-- rightVertexList 'empty'           == []
+-- rightVertexList ('leftVertex' x)  == []
+-- rightVertexList ('rightVertex' x) == [x]
+-- rightVertexList . 'vertices' []   == 'Data.List.nub' . 'Data.List.sort'
+-- @
+rightVertexList :: AdjacencyMap a b -> [b]
+rightVertexList = Map.keys . rightAdjacencyMap
+
+
+-- | The sorted list of vertices of a given graph.
+-- Complexity: /O(n)/ time and memory
+--
+-- @
+-- vertexList 'empty'                             == []
+-- vertexList ('vertex' x)                        == [x]
+-- vertexList (vertices ('Data.Either.lefts' vs) ('Data.Either.rights' vs)) == 'Data.List.nub' ('Data.List.sort' vs)
+-- @
+vertexList :: AdjacencyMap a b -> [Either a b]
+vertexList g = (map Left $ leftVertexList g) ++ (map Right $ rightVertexList g)
+
+
+-- | The sorted list of edges of a graph.
+-- Complexity: /O(n + m)/ time and /O(m)/ memory.
+--
+-- @
+-- edgeList 'empty'      == []
+-- edgeList ('vertex' x) == []
+-- edgeList ('edge' x y) == [(x, y)]
+-- edgeList . 'edges'    == 'Data.List.nub' . 'Data.List.sort'
+-- @
+edgeList :: AdjacencyMap a b -> [(a, b)]
+edgeList (BAM lr _) = [ (u, v) | (u, vs) <- Map.toAscList lr, v <- Set.toAscList vs ]
+
+
+-- | The set of vertices of the left part of a given graph.
+-- Complexity: /O(l)/ time and memory.
+--
+-- @
+-- leftVertexSet 'empty'                == Set.'Data.Set.empty'
+-- leftVertexSet . 'leftVertex'         == Set.'Data.Set.singleton'
+-- leftVertexSet . 'rightVertex'        == 'const' Set.'Data.Set.empty'
+-- leftVertexSet . ('flip' 'vertices') [] == Set.'Data.Set.fromList'
+-- @
+leftVertexSet :: AdjacencyMap a b -> Set.Set a
+leftVertexSet = Map.keysSet . leftAdjacencyMap
+
+
+-- | The set of vertices of the right part of a given graph.
+-- Complexity: /O(r)/ time and memory.
+--
+-- @
+-- rightVertexSet 'empty'         == Set.'Data.Set.empty'
+-- rightVertexSet . 'leftVertex'  == 'const' Set.'Data.Set.empty'
+-- rightVertexSet . 'rightVertex' == Set.'Data.Set.singleton'
+-- rightVertexSet . 'vertices' [] == Set.'Data.Set.fromList'
+-- @
+rightVertexSet :: AdjacencyMap a b -> Set.Set b
+rightVertexSet = Map.keysSet . rightAdjacencyMap
+
+
+-- | The set of vertices of a given graph.
+-- Complexity: /O(n)/ time and memory.
+--
+-- @
+-- vertexSet 'empty'                             == Set.'Data.Set.empty'
+-- vertexSet . 'vertex'                          == Set.'Data.Set.singleton'
+-- vertexSet ('vertices' ('Data.Either.lefts' vs) ('Data.Either.rights' vs)) == Set.'Data.Set.fromList' vs
+-- @
+vertexSet :: (Ord a, Ord b) => AdjacencyMap a b -> Set.Set (Either a b)
+vertexSet = Set.fromAscList . vertexList
+
+
+-- | The set of edges of a given graph.
+-- Complexity: /O(n + m)/ time and /O(m)/ memory.
+--
+-- @
+-- edgeSet 'empty'      == Set.'Data.Set.empty'
+-- edgeSet ('vertex' x) == Set.'Data.Set.empty'
+-- edgeSet ('edge' x y) == Set.'Data.Set.singleton' (x, y)
+-- edgeSet . 'edges'    == Set.'Data.Set.fromList'
+-- @
+edgeSet :: (Ord a, Ord b) => AdjacencyMap a b -> Set.Set (a, b)
+edgeSet = Set.fromAscList . edgeList
+
+
+-- | Test the given adjacency map on bipartiteness. In case of success,
+-- return an `AdjacencyMap` with the same set of edges and the vertices marked
+-- with the part they belong to.
+--
+-- /Note/: as `AdjacencyMap` only represents __undirected__ bipartite graphs,
+-- all edges in the input graph are assumed to be bidirected and all edges in
+-- the output `AdjacencyMap` are bidirected.
+--
+-- It is advised to use 'leftVertexList' and 'rightVertexList' to obtain the
+-- partition of the vertices and 'hasLeftVertex' and 'hasRightVertex' to check
+-- whether a vertex belong to a part.
+--
+-- @
+-- detectParts 'Algebra.Graph.AdjacencyMap.empty'                             == Just 'empty'
+-- 'Data.Maybe.isJust' (detectParts ('Algebra.Graph.AdjacencyMap.vertex' x))               == True
+-- 'Data.Maybe.isJust' (detectParts ('Algebra.Graph.AdjacencyMap.edge' x y))               == True
+-- 'Data.Maybe.isJust' (detectParts ('Algebra.Graph.AdjacencyMap.edges' [(1, 2), (1, 3)])) == True
+-- 'Data.Maybe.isJust' (detectParts ('Algebra.Graph.AdjacencyMap.clique' k))               == k < 3
+-- 'Data.Maybe.isJust' (detectParts ('Algebra.Graph.AdjacencyMap.star' x ys))              == True
+-- 'Data.Maybe.isJust' (detectParts ('Algebra.Graph.AdjacencyMap.tree' t))                 == True
+-- 'Data.Maybe.isJust' (detectParts ('Algebra.Graph.AdjacencyMap.biclique' xs ys))         == True
+-- 'Data.Maybe.isJust' ('fromBipartite' ('toBipartite' am))       == True
+-- @
+detectParts :: Ord a => AM.AdjacencyMap a -> Maybe (AdjacencyMap a a)
+detectParts = undefined

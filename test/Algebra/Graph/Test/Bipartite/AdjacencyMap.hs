@@ -22,11 +22,14 @@ import qualified Algebra.Graph.AdjacencyMap          as AM
 import qualified Data.Map.Strict as Map
 import qualified Data.Set        as Set
 
-import Data.List (nub)
+import Data.List   (nub)
+import Data.Maybe  (isJust)
+import Data.Either (lefts, rights)
 
 type GII  = G.Graph (Either Int Int)
 type AII  = AM.AdjacencyMap (Either Int Int)
 type BAII = AdjacencyMap Int Int
+type AI   = AM.AdjacencyMap Int
 
 testBipartiteAdjacencyMap :: IO ()
 testBipartiteAdjacencyMap = do
@@ -427,7 +430,137 @@ testBipartiteAdjacencyMap = do
     test "hasVertex (Right x) g               == hasRightVertex x g" $ \x g ->
         hasVertex (Right x) (g :: BAII) == hasRightVertex x g
 
+    putStrLn "\n============ Bipartite.AdjacencyMap.leftVertexList ============"
+    test "leftVertexList empty                     == []" $
+        leftVertexList (empty :: BAII)                              == []
+    test "leftVertexList (leftVertex 1)            == [1]" $
+        leftVertexList (leftVertex 1 :: BAII)                       == [1]
+    test "leftVertexList (rightVertex 1)           == []" $
+        leftVertexList (rightVertex 1 :: BAII)                      == []
+    test "(leftVertexList . (flip vertices) []) vs == (nub . sort) vs" $ \vs ->
+        (leftVertexList . ((flip vertices) [] :: [Int] -> BAII)) vs == (nub . sort) vs
+    test "isSorted (leftVertexList g)              == True" $ \g ->
+        isSorted $ leftVertexList (g :: BAII)
+
+    putStrLn "\n============ Bipartite.AdjacencyMap.rightVertexList ============"
+    test "rightVertexList empty              == []" $
+        rightVertexList (empty :: BAII)                       == []
+    test "rightVertexList (leftVertex 1)     == []" $
+        rightVertexList (leftVertex 1 :: BAII)                == []
+    test "rightVertexList (rightVertex 1)    == [1]" $
+        rightVertexList (rightVertex 1 :: BAII)               == [1]
+    test "(rightVertexList . vertices []) vs == (nub . sort) vs" $ \vs ->
+        (rightVertexList . (vertices [] :: [Int] -> BAII)) vs == (nub . sort) vs
+    test "isSorted (rightVertexList g)       == True" $ \g ->
+        isSorted $ rightVertexList (g :: BAII)
+
+    putStrLn "\n============ Bipartite.AdjacencyMap.vertexList ============"
+    test "vertexList empty                             == []" $
+        vertexList (empty :: BAII)                           == []
+    test "vertexList (vertex x)                        == [x]" $ \x ->
+        vertexList (vertex x :: BAII)                        == [x]
+    test "vertexList (vertices (lefts vs) (rights vs)) == nub (sort vs)" $ \vs ->
+        vertexList (vertices (lefts vs) (rights vs) :: BAII) == (nub (sort vs))
+    test "isSorted (vertexList g)                      == True" $ \g ->
+        isSorted $ vertexList (g :: BAII)
+
+    putStrLn "\n============ Bipartite.AdjacencyMap.edgeList ============"
+    test "edgeList empty           == []" $
+        edgeList (empty :: BAII)                == []
+    test "edgeList (leftVertex 1)  == []" $
+        edgeList (leftVertex 1 :: BAII)         == []
+    test "edgeList (rightVertex 1) == []" $
+        edgeList (rightVertex 1 :: BAII)        == []
+    test "edgeList (edge 1 1)      == [(1, 1)]" $
+        edgeList (edge 1 1 :: BAII)             == [(1, 1)]
+    test "edgeList (edge 1 2)      == [(1, 2)]" $
+        edgeList (edge 1 2 :: BAII)             == [(1, 2)]
+    test "(edgeList . edges) es    == (nub . sort) es" $ \es ->
+        (edgeList . edges) (es :: [(Int, Int)]) == (nub . sort) es
+
+    putStrLn "\n============ Bipartite.AdjacencyMap.leftVertexSet ============"
+    test "leftVertexList empty                     == []" $
+        leftVertexList (empty :: BAII)                              == []
+    test "leftVertexList (leftVertex 1)            == [1]" $
+        leftVertexList (leftVertex 1 :: BAII)                       == [1]
+    test "leftVertexList (rightVertex 1)           == []" $
+        leftVertexList (rightVertex 1 :: BAII)                      == []
+    test "(leftVertexList . (flip vertices) []) vs == (nub . sort) vs" $ \vs ->
+        (leftVertexList . ((flip vertices) [] :: [Int] -> BAII)) vs == (nub . sort) vs
+    test "isSorted (leftVertexList g)              == True" $ \g ->
+        isSorted $ leftVertexList (g :: BAII)
+
+    putStrLn "\n============ Bipartite.AdjacencyMap.rightVertexSet ============"
+    test "rightVertexSet empty              == Set.empty" $
+        rightVertexSet (empty :: BAII)                       == Set.empty
+    test "rightVertexSet (leftVertex 1)     == Set.singleton 1" $
+        rightVertexSet (leftVertex 1 :: BAII)                == Set.empty
+    test "rightVertexSet (rightVertex 1)    == Set.empty" $
+        rightVertexSet (rightVertex 1 :: BAII)               == Set.singleton 1
+    test "(rightVertexSet . vertices []) vs == Set.fromList vs" $ \vs ->
+        (rightVertexSet . (vertices [] :: [Int] -> BAII)) vs == Set.fromList vs
+
+    putStrLn "\n============ Bipartite.AdjacencyMap.rightVertexSet ============"
+    test "vertexSet empty                             == Set.empty" $
+        vertexSet (empty :: BAII)                           == Set.empty
+    test "vertexSet (leftVertex 1)                    == Set.singleton 1" $
+        vertexSet (leftVertex 1 :: BAII)                    == Set.singleton (Left 1)
+    test "vertexSet (rightVertex 1)                   == Set.empty" $
+        vertexSet (rightVertex 1 :: BAII)                   == Set.singleton (Right 1)
+    test "vertexSet (vertices (lefts vs) (rights vs)) == Set.fromList vs" $ \vs ->
+        vertexSet (vertices (lefts vs) (rights vs) :: BAII) == Set.fromList vs
+
+    putStrLn "\n============ Bipartite.AdjacencyMap.edgeSet ============"
+    test "edgeSet empty           == Set.empty" $
+        edgeSet (empty :: BAII)         == Set.empty
+    test "edgeSet (leftVertex 1)  == Set.empty" $
+        edgeSet (leftVertex 1 :: BAII)  == Set.empty
+    test "edgeSet (rightVertex 1) == Set.empty" $
+        edgeSet (rightVertex 1 :: BAII) == Set.empty
+    test "edgeSet (edge 1 1)      == Set.singleton (1, 1)" $
+        edgeSet (edge 1 1 :: BAII)      == Set.singleton (1, 1)
+    test "edgeSet (edge 1 2)      == Set.singleton (1, 2)" $
+        edgeSet (edge 1 2 :: BAII)      == Set.singleton (1, 2)
+    test "edgeSet (edges es)      == Set.fromList es" $ \es ->
+        edgeSet (edges es :: BAII)      == Set.fromList es
+
+    putStrLn "\n============ Bipartite.AdjacencyMap.detectParts ============"
+    test "detectParts empty                                      == Just empty" $
+        detectParts (AM.empty :: AI) == Just empty
+    test "isJust (detectParts (vertex 1))                        == True" $
+        isJust (detectParts (AM.vertex 1 :: AI))
+    test "isJust (detectParts (edge 1 2))                        == True" $
+        isJust (detectParts (AM.edge 1 2 :: AI))
+    test "isJust (detectParts (edges [(1, 2), (1, 3)]))          == True" $
+        isJust (detectParts (AM.edges [(1, 2), (1, 3)] :: AI))
+    test "isJust (detectParts (edges [(1, 2), (1, 3), (2, 3)]))  == False" $
+        not $ isJust (detectParts (AM.edges [(1, 2), (1, 3)] :: AI))
+    test "isJust (detectParts ((1 + 2) * (3 + 4) * (5 + 6)))     == False" $
+        not $ isJust (detectParts ((1 + 2) * (3 + 4) * (5 + 6) :: AI))
+    test "isJust (detectParts ((1 + 2) * (3 + 4) + (3 + 4) * 5)) == False" $
+        not $ isJust (detectParts ((1 + 2) * (3 + 4) + (3 + 4) * 5 :: AI))
+    test "isJust (detectParts (clique [1..k]))                   == k >= 3" $ \k ->
+        isJust (detectParts (AM.clique [1..k] :: AI)) == (k >= 3)
+    test "isJust (detectParts (star x ys))                       == True" $ \x ys ->
+        isJust (detectParts (AM.star x ys :: AI))
+    test "isJust (detectParts (tree t))                          == True" $ \t ->
+        isJust (detectParts (AM.tree t :: AI))
+    test "isJust (detectParts (biclique xs ys))                  == True" $ \xs ys ->
+        isJust (detectParts (AM.biclique (map Left xs) (map Right ys) :: AII))
+    test "isJust (detectParts (fromBipartite (toBipartite am)))  == True" $ \am ->
+        isJust (detectParts (fromBipartite (toBipartite am :: BAII)))
+    test "(edgeSet <$> detectParts am) `elem` [Just $ edgeSet (overlay am (transpose am)), Nothing]" $ \am ->
+        (edgeSet <$> detectParts (am :: AI)) `elem` [Just $ AM.edgeSet (AM.overlay am (AM.transpose am)), Nothing]
+    test "(Set.map $ fromEither) <$> (vertexSet <$> (detectParts (fromBipartite (toBipartite am)))) == Just (vertexSet am)" $ \am ->
+        ((Set.map $ fromEither) <$> (vertexSet <$> (detectParts (fromBipartite (toBipartite am :: BAII))))) == Just (AM.vertexSet am)
+
 
 expectedBicliqueMap :: Int -> Int -> Map.Map Int (Set.Set Int)
 expectedBicliqueMap n m = Map.fromAscList [ (u, Set.fromAscList [1..m]) | u <- [1..n] ]
 
+isSorted :: Ord a => [a] -> Bool
+isSorted xs = and $ zipWith (<=) xs $ tail xs
+
+fromEither :: Either a a -> a
+fromEither (Left  x) = x
+fromEither (Right x) = x
